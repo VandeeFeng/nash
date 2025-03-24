@@ -734,22 +734,18 @@
         const currentTitle = document.getElementById("filename").innerHTML;
         const currentContent = document.getElementById("editor").innerHTML;
         const cleanTitle = currentTitle.replace(/<!--[\s\S]*?-->/g, '').trim();
-        const docTitle = cleanTitle || "Nash : Note as HTML";
 
         // Create content markers
         const titleMarker = '<!--%%TITLE%%-->';
         const contentMarker = '<!--%%CONTENT%%-->';
-        const docTitleMarker = '<!--%%DOCTITLE%%-->';
 
         // Find the positions of the markers
         const titleStart = templateText.indexOf(titleMarker);
         const titleEnd = templateText.indexOf(titleMarker, titleStart + 1);
         const contentStart = templateText.indexOf(contentMarker);
         const contentEnd = templateText.indexOf(contentMarker, contentStart + 1);
-        const docTitleStart = templateText.indexOf(docTitleMarker);
-        const docTitleEnd = templateText.indexOf(docTitleMarker, docTitleStart + 1);
 
-        if (titleStart === -1 || titleEnd === -1 || contentStart === -1 || contentEnd === -1 || docTitleStart === -1 || docTitleEnd === -1) {
+        if (titleStart === -1 || titleEnd === -1 || contentStart === -1 || contentEnd === -1) {
             console.error('Content markers not found in template');
             return;
         }
@@ -758,12 +754,10 @@
         const titleTagStart = templateText.indexOf("<title>") + 7;
         const titleTagEnd = templateText.indexOf("</title>");
         
-        // Replace the content between markers and title tag
+        // Replace the content between markers
         let content = templateText.substring(0, titleTagStart) +
-            docTitle +
-            templateText.substring(titleTagEnd, docTitleStart + docTitleMarker.length) +
-            docTitle +
-            templateText.substring(docTitleEnd, titleStart + titleMarker.length) +
+            cleanTitle +
+            templateText.substring(titleTagEnd, titleStart + titleMarker.length) +
             currentTitle +
             templateText.substring(titleEnd, contentStart + contentMarker.length) +
             currentContent +
