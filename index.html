@@ -4,7 +4,6 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://lf26-cdn-tos.bytecdntp.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;">
     <title>Nash : Note as HTML</title>
     <link rel="icon" type="image/svg+xml"
           href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%3E%0A%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22black%22%2F%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20font-size%3D%2260%22%20font-weight%3D%22bold%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%2C%20sans-serif%22%20dominant-baseline%3D%22central%22%3EN.%3C%2Ftext%3E%0A%3C%2Fsvg%3E">
@@ -271,11 +270,6 @@
            /* background: #f4f4f4; */
        }
 
-       #editor p {
-           margin-top: 0.5em;
-           margin-bottom: 0.5em;
-       }
-
        #editor a {
            color: var(--note-link-color);
            text-decoration: none;
@@ -345,40 +339,50 @@
        #preview {
            padding: 15px;
            min-height: 250px;
-           line-height: 1.6;
+           outline: none;
            font-size: 16px;
+           line-height: 1.6;
            font-family: 'Arial', sans-serif;
+           color: var(--page-text-color);
+           background: var(--note-bg-color);
        }
-       
-       #preview h1, #preview h2, #preview h3, #preview h4, #preview h5, #preview h6, #preview p {
-           margin-top: 0.5em;
-           margin-bottom: 0.5em;
+
+       #editor h1, #editor h2, #editor h3, #editor h4, #editor h5, #editor h6,
+       #preview h1, #preview h2, #preview h3, #preview h4, #preview h5, #preview h6 {
+           margin-top: 0.4em;
+           margin-bottom: 0.2em;
        }
-       
-       #preview h1 { font-size: 2em; }
-       #preview h2 { font-size: 1.5em; }
-       #preview h3 { font-size: 1.17em; }
-       #preview h4 { font-size: 1em; }
-       #preview h5 { font-size: 0.83em; }
-       #preview h6 { font-size: 0.67em; }
+
+       #editor p, #preview p {
+           margin-top: 0.2em;
+           margin-bottom: 0.2em;
+       }
        
        #preview code {
-           background: #f4f4f4;
+           background: var(--control-bg-color);
            padding: 2px 4px;
            border-radius: 4px;
+           font-family: monospace;
        }
        
        #preview pre {
-           background: #f4f4f4;
+           background: var(--control-bg-color);
            padding: 1em;
            border-radius: 8px;
            overflow-x: auto;
        }
        
+       #preview pre code {
+           background: none;
+           padding: 0;
+           border-radius: 0;
+       }
+       
        #preview blockquote {
-           border-left: 4px solid #ddd;
+           border-left: 4px solid var(--control-bg-color);
            padding-left: 1em;
            margin-left: 0;
+           color: var(--control-text-color);
        }
 
        #preview a {
@@ -404,6 +408,27 @@
            display: block;
            margin: 10px 0;
            border-radius: 12px;
+       }
+
+       #preview strong, #preview b {
+           font-weight: bold;
+       }
+
+       #preview em, #preview i {
+           font-style: italic;
+       }
+
+       #preview u {
+           text-decoration: underline;
+       }
+
+       #preview ul, #preview ol {
+           padding-left: 2em;
+           margin: 0.5em 0;
+       }
+
+       #preview li {
+           margin: 0.3em 0;
        }
     </style>
   </head>
@@ -537,13 +562,7 @@
     </div>
 
     <script>
-      /* ============================================================================
-       * EDITOR CORE FUNCTIONS
-       * Core functionality for the editor including:
-       * - Edit mode control
-       * - Content conversion
-       * - File operations
-       * ============================================================================ */
+
       function setEditMode(editMode) {
         let editor = document.getElementById("editor");
         let toolbar = document.getElementById("toolbar");
@@ -637,6 +656,16 @@
           isPreviewMode = !isPreviewMode;
           
           if (isPreviewMode) {
+              // Configure marked options
+              marked.setOptions({
+                  gfm: true, // GitHub Flavored Markdown
+                  breaks: true, // Convert line breaks to <br>
+                  headerIds: false, // Don't add ids to headers
+                  mangle: false, // Don't escape HTML
+                  smartLists: true, // Use smarter list behavior
+                  smartypants: true // Use smart punctuation
+              });
+              
               // Use DocumentFragment for better performance
               const fragment = document.createDocumentFragment();
               const contentParts = [];
@@ -663,6 +692,13 @@
                           // All chunks processed, update preview
                           const content = contentParts.join('').replace(/\n{3,}/g, '\n\n').trim();
                           preview.innerHTML = marked.parse(content);
+                          
+                          // Process links after markdown conversion
+                          preview.querySelectorAll('a').forEach(link => {
+                              if (!link.getAttribute('target')) {
+                                  link.setAttribute('target', '_blank');
+                              }
+                          });
                       }
                   }
                   
@@ -752,82 +788,6 @@
         .map(script => script.outerHTML)
         .join('\n');
 
-      /* ============================================================================
-       * CONTENT HANDLING AND SECURITY
-       * Functions for content manipulation and security:
-       * - HTML sanitization
-       * - File content handling
-       * - Media handling
-       * ============================================================================ */
-      // HTML sanitizer function
-      function sanitizeHTML(html) {
-          const allowedTags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'img', 'strong', 'em', 'span', 'br'];
-          const allowedAttrs = {
-              'a': ['href'],
-              'img': ['src', 'alt'],
-              'span': ['style']
-          };
-          
-          // Use DOMParser to parse HTML
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, 'text/html');
-          
-          // Recursively clean nodes
-          function cleanNode(node) {
-              if (node.nodeType === Node.TEXT_NODE) {
-                  return node.cloneNode(true);
-              }
-              
-              if (node.nodeType !== Node.ELEMENT_NODE) {
-                  return null;
-              }
-              
-              const tagName = node.tagName.toLowerCase();
-              if (!allowedTags.includes(tagName)) {
-                  return document.createTextNode(node.textContent);
-              }
-              
-              const newNode = document.createElement(tagName);
-              
-              // Only copy allowed attributes
-              if (allowedAttrs[tagName]) {
-                  allowedAttrs[tagName].forEach(attr => {
-                      if (node.hasAttribute(attr)) {
-                          let value = node.getAttribute(attr);
-                          // Additional security check for URL attributes
-                          if (attr === 'href' || attr === 'src') {
-                              try {
-                                  const url = new URL(value, window.location.href);
-                                  // Only allow http and https protocols
-                                  if (url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'data:' || url.protocol === 'blob:') {
-                                      newNode.setAttribute(attr, value);
-                                  }
-                              } catch (e) {
-                                  // URL parsing failed, ignore this attribute
-                              }
-                          } else {
-                              newNode.setAttribute(attr, value);
-                          }
-                      }
-                  });
-              }
-              
-              // Recursively process child nodes
-              Array.from(node.childNodes).forEach(child => {
-                  const cleanedChild = cleanNode(child);
-                  if (cleanedChild) {
-                      newNode.appendChild(cleanedChild);
-                  }
-              });
-              
-              return newNode;
-          }
-          
-          // Clean the entire document
-          const cleanDoc = cleanNode(doc.body);
-          return cleanDoc.innerHTML;
-      }
-
       async function exportToFile(save, editMode) {
         let filename = document.getElementById("filename").innerText.trim();
         if (!filename) {
@@ -847,7 +807,7 @@
 
         // Get current content and clean title
         const currentTitle = document.getElementById("filename").innerHTML;
-        const currentContent = sanitizeHTML(document.getElementById("editor").innerHTML);
+        const currentContent = document.getElementById("editor").innerHTML;
         const cleanTitle = currentTitle.replace(/<!--[\s\S]*?-->/g, '').trim();
 
         // Create content markers
@@ -917,13 +877,6 @@
         }
       }
 
-      /* ============================================================================
-       * UI AND TEXT FORMATTING
-       * Functions for UI interactions and text formatting:
-       * - Dropdown controls
-       * - Text styling
-       * - Block operations
-       * ============================================================================ */
       // Toggle dropdown visibility
       function toggleDropdown(id) {
         const dropdown = document.getElementById(id);
@@ -1046,15 +999,6 @@
           } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'P') {
             cleanNodeContent(node);
           }
-        });
-        
-        // Remove any nested p tags
-        editor.querySelectorAll('p p').forEach(nested => {
-          const parent = nested.parentNode;
-          while (nested.firstChild) {
-            parent.insertBefore(nested.firstChild, nested);
-          }
-          parent.removeChild(nested);
         });
       }
 
@@ -1235,13 +1179,6 @@
         }
       }
 
-      /* ============================================================================
-       * EDITOR MAINTENANCE AND EVENT HANDLING
-       * Functions for editor maintenance and event handling:
-       * - Content normalization
-       * - Event listeners
-       * - Initialization
-       * ============================================================================ */
       // Normalize stray text nodes and nested blocks.
       function normalizeEditor() {
         const editor = document.getElementById('editor');
@@ -1328,7 +1265,7 @@
 
       updateTitle();
 
-    </script>
+      </script>
 
   </body>
 
