@@ -1015,15 +1015,36 @@
       function formatAll() {
         const editor = document.getElementById('editor');
         const nodes = Array.from(editor.childNodes);
+        
+        // Helper function to clean node content
+        function cleanNodeContent(node) {
+          // Remove color and background-color styles from spans
+          const spans = node.querySelectorAll('span');
+          spans.forEach(span => {
+            if (span.style.color || span.style.backgroundColor) {
+              const text = document.createTextNode(span.textContent);
+              span.parentNode.replaceChild(text, span);
+            }
+          });
+          
+          // Clean empty spans
+          node.querySelectorAll('span:empty').forEach(span => span.remove());
+          
+          return node;
+        }
+        
         nodes.forEach(node => {
           if (node.nodeType === Node.ELEMENT_NODE && node.tagName !== 'P') {
             const p = document.createElement('p');
             p.innerHTML = node.innerHTML;
+            cleanNodeContent(p);
             editor.replaceChild(p, node);
           } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
             const p = document.createElement('p');
             p.textContent = node.textContent;
             editor.replaceChild(p, node);
+          } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'P') {
+            cleanNodeContent(node);
           }
         });
         
