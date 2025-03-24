@@ -533,8 +533,74 @@
           isPreviewMode = !isPreviewMode;
           
           if (isPreviewMode) {
-              // Convert content to Markdown
-              const content = editor.innerText;
+              // Convert HTML to Markdown first
+              function convertNodeToMarkdown(node) {
+                  if (node.nodeType === Node.TEXT_NODE) {
+                      return node.textContent;
+                  }
+                  
+                  if (node.nodeType === Node.ELEMENT_NODE) {
+                      let markdown = '';
+                      const tag = node.tagName.toLowerCase();
+                      let text = node.textContent.trim();
+                      
+                      // First check if the text content is already in Markdown format
+                      if (text.startsWith('```') || text.startsWith('#')) {
+                          return text + '\n\n';
+                      }
+                      
+                      // Handle block elements
+                      if (tag.match(/^h[1-6]$/)) {
+                          const level = tag[1];
+                          markdown = '#'.repeat(level) + ' ' + node.textContent + '\n\n';
+                      }
+                      else if (tag === 'p') {
+                          const text = Array.from(node.childNodes)
+                              .map(child => convertNodeToMarkdown(child))
+                              .join('');
+                          // Remove escape characters for markdown syntax
+                          const cleanText = text.replace(/\\([#`*_{}[\]()>+-.])/g, '$1');
+                          markdown = cleanText + '\n\n';
+                      }
+                      // Handle inline elements
+                      else if (tag === 'strong' || tag === 'b') {
+                          markdown = '**' + node.textContent + '**';
+                      }
+                      else if (tag === 'em' || tag === 'i') {
+                          markdown = '*' + node.textContent + '*';
+                      }
+                      else if (tag === 'u') {
+                          markdown = '_' + node.textContent + '_';
+                      }
+                      else if (tag === 'a') {
+                          markdown = '[' + node.textContent + '](' + node.href + ')';
+                      }
+                      else if (tag === 'img') {
+                          const alt = node.alt || '';
+                          markdown = '![' + alt + '](' + node.src + ')\n\n';
+                      }
+                      else if (tag === 'span') {
+                          // For spans, just process their content
+                          markdown = Array.from(node.childNodes)
+                              .map(child => convertNodeToMarkdown(child))
+                              .join('');
+                      }
+                      
+                      return markdown;
+                  }
+                  
+                  return '';
+              }
+
+              let content = '';
+              editor.childNodes.forEach(node => {
+                  content += convertNodeToMarkdown(node);
+              });
+              
+              // Clean up multiple newlines
+              content = content.replace(/\n{3,}/g, '\n\n').trim();
+              
+              // Convert to HTML using marked
               preview.innerHTML = marked.parse(content);
               editor.style.display = 'none';
               preview.style.display = 'block';
@@ -556,33 +622,72 @@
         const editor = document.getElementById("editor");
         let content = '';
         
-        // Process each block element
-        editor.childNodes.forEach((node, index) => {
-            if (node.nodeType === Node.ELEMENT_NODE) {
-                let text = node.innerText.trim();
-                
-                // Remove escape characters
-                text = text.replace(/\\([#`*_{}[\]()>+-.])/g, '$1');
-                
-                // Handle code blocks
-                if (text.startsWith('```')) {
-                    content += text + '\n';
-                }
-                // Handle headers
-                else if (text.startsWith('#')) {
-                    content += text + '\n';
-                }
-                // Handle normal paragraphs
-                else {
-                    content += text + '\n';
-                }
-                
-                // Add extra newline between blocks
-                if (index < editor.childNodes.length - 1) {
-                    content += '\n';
-                }
+        // Convert HTML to Markdown
+        function convertNodeToMarkdown(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                return node.textContent;
             }
+            
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                let markdown = '';
+                const tag = node.tagName.toLowerCase();
+                let text = node.textContent.trim();
+                
+                // First check if the text content is already in Markdown format
+                if (text.startsWith('```') || text.startsWith('#')) {
+                    return text + '\n\n';
+                }
+                
+                // Handle block elements
+                if (tag.match(/^h[1-6]$/)) {
+                    const level = tag[1];
+                    markdown = '#'.repeat(level) + ' ' + node.textContent + '\n\n';
+                }
+                else if (tag === 'p') {
+                    const text = Array.from(node.childNodes)
+                        .map(child => convertNodeToMarkdown(child))
+                        .join('');
+                    // Remove escape characters for markdown syntax
+                    const cleanText = text.replace(/\\([#`*_{}[\]()>+-.])/g, '$1');
+                    markdown = cleanText + '\n\n';
+                }
+                // Handle inline elements
+                else if (tag === 'strong' || tag === 'b') {
+                    markdown = '**' + node.textContent + '**';
+                }
+                else if (tag === 'em' || tag === 'i') {
+                    markdown = '*' + node.textContent + '*';
+                }
+                else if (tag === 'u') {
+                    markdown = '_' + node.textContent + '_';
+                }
+                else if (tag === 'a') {
+                    markdown = '[' + node.textContent + '](' + node.href + ')';
+                }
+                else if (tag === 'img') {
+                    const alt = node.alt || '';
+                    markdown = '![' + alt + '](' + node.src + ')\n\n';
+                }
+                else if (tag === 'span') {
+                    // For spans, just process their content
+                    markdown = Array.from(node.childNodes)
+                        .map(child => convertNodeToMarkdown(child))
+                        .join('');
+                }
+                
+                return markdown;
+            }
+            
+            return '';
+        }
+        
+        // Process each block element
+        editor.childNodes.forEach(node => {
+            content += convertNodeToMarkdown(node);
         });
+
+        // Clean up multiple newlines
+        content = content.replace(/\n{3,}/g, '\n\n').trim();
 
         let blob = new Blob([content], { type: "text/markdown" });
         let file = new File([blob], filename, { type: "text/markdown" });
