@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><!--%%DOCTITLE%%-->Stay simple<!--%%TITLE%%--><!--%%TITLE%%--><!--%%DOCTITLE%%--></title>
+    <title>Stay simple</title>
     <link rel="icon" type="image/svg+xml"
           href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%3E%0A%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22black%22%2F%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20font-size%3D%2260%22%20font-weight%3D%22bold%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%2C%20sans-serif%22%20dominant-baseline%3D%22central%22%3EN.%3C%2Ftext%3E%0A%3C%2Fsvg%3E">
     <script src="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/marked/4.0.2/marked.min.js"></script>
@@ -494,7 +494,7 @@
       </div>
 
       <div id="editorContainer" class="thin-line">
-        <div id="editor" contenteditable="true"><!--%%CONTENT%%--><p>发现一个和 tiddlywiki 理念类似的笔记项目：<a href="https://github.com/keepworking/nash">nash</a> 。</p><p>就是用一个单个的 HTML 文件来记录笔记。</p><p>我从开始记笔记的时候，正是 Markdown 笔记盛行的时候，以至于忽略了许多其他的方法，例如 tiddlywiki。</p><p>Markdown 其实也就是提供了一个通行的简单的语法。随着编程学习的深入，Markdown 的优势和便利其实也就还好了。</p><p>由于现在有越来越多要把笔记 public 的需求，不如直接就用 HTML，省去了 markdown 的这一步。</p><p>一个开箱即用的笔记编辑、保存功能，也就是只需要这么简单就好。</p><p>其实之前很早就接触到用 HTML 网页来保存笔记的概念，看到很多人也这么在做，只是惯性上总是想着 markdown，一直没有尝试。</p><p>这个项目作为一个 startkit 实在太合适了。</p><p>都有一点想把 tiddlywiki 转移过来了🤣。</p><!--%%CONTENT%%--><!--%%CONTENT%%--><!--%%CONTENT%%--></div>
+        <div id="editor" contenteditable="true"><!--%%CONTENT%%--><p>发现一个和 tiddlywiki 理念类似的笔记项目：<a href="https://github.com/keepworking/nash">nash</a> 。</p><p>就是用一个单个的 HTML 文件来记录笔记。</p><p>我从开始记笔记的时候，正是 Markdown 笔记盛行的时候，以至于忽略了许多其他的方法，例如 tiddlywiki。</p><p>Markdown 其实也就是提供了一个通行的简单的语法。随着编程学习的深入，Markdown 的优势和便利其实也就还好了。</p><p>由于现在有越来越多要把笔记 public 的需求，不如直接就用 HTML，省去了 markdown 的这一步。</p><p>一个开箱即用的笔记编辑、保存功能，也就是只需要这么简单就好。</p><p>其实之前很早就接触到用 HTML 网页来保存笔记的概念，看到很多人也这么在做，只是惯性上总是想着 markdown，一直没有尝试。</p><p>这个项目作为一个 startkit 实在太合适了。</p><p>都有一点想把 tiddlywiki 转移过来了🤣。</p><p><br></p><!--%%CONTENT%%--><!--%%CONTENT%%--><!--%%CONTENT%%--></div>
         <div id="preview" style="display: none;"></div>
       </div>
 
@@ -730,33 +730,34 @@
         const response = await fetch(window.location.href);
         const templateText = await response.text();
 
-        // Get current content
+        // Get current content and clean title
         const currentTitle = document.getElementById("filename").innerHTML;
         const currentContent = document.getElementById("editor").innerHTML;
-        const docTitle = currentTitle.trim() || "Nash : Note as HTML";
+        const cleanTitle = currentTitle.replace(/<!--[\s\S]*?-->/g, '').trim();
 
         // Create content markers
         const titleMarker = '<!--%%TITLE%%-->';
         const contentMarker = '<!--%%CONTENT%%-->';
-        const docTitleMarker = '<!--%%DOCTITLE%%-->';
 
         // Find the positions of the markers
         const titleStart = templateText.indexOf(titleMarker);
         const titleEnd = templateText.indexOf(titleMarker, titleStart + 1);
         const contentStart = templateText.indexOf(contentMarker);
         const contentEnd = templateText.indexOf(contentMarker, contentStart + 1);
-        const docTitleStart = templateText.indexOf(docTitleMarker);
-        const docTitleEnd = templateText.indexOf(docTitleMarker, docTitleStart + 1);
 
-        if (titleStart === -1 || titleEnd === -1 || contentStart === -1 || contentEnd === -1 || docTitleStart === -1 || docTitleEnd === -1) {
+        if (titleStart === -1 || titleEnd === -1 || contentStart === -1 || contentEnd === -1) {
             console.error('Content markers not found in template');
             return;
         }
 
+        // First update the title tag
+        const titleTagStart = templateText.indexOf("<title>") + 7;
+        const titleTagEnd = templateText.indexOf("</title>");
+        
         // Replace the content between markers
-        let content = templateText.substring(0, docTitleStart + docTitleMarker.length) +
-            docTitle +
-            templateText.substring(docTitleEnd, titleStart + titleMarker.length) +
+        let content = templateText.substring(0, titleTagStart) +
+            cleanTitle +
+            templateText.substring(titleTagEnd, titleStart + titleMarker.length) +
             currentTitle +
             templateText.substring(titleEnd, contentStart + contentMarker.length) +
             currentContent +
