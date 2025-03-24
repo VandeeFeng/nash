@@ -460,10 +460,15 @@
         </div>
 
         <div id="splitbar">|</div>
-        <button onclick="toggleMarkdownPreview()">MD</button>
+        <button onclick="toggleMarkdownPreview()" title="Preview" style="display: flex; align-items: center; justify-content: center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" style="fill: currentColor;">
+            <rect x="2" y="2" width="20" height="20" rx="2" style="fill: none; stroke: currentColor; stroke-width: 2;"/>
+            <text x="6" y="16" style="font: bold 14px sans-serif;">M</text>
+          </svg>
+        </button>
         <!-- Block conversion -->
         <div class="dropdown">
-          <button onclick="toggleDropdown('saveDropdown')">💾</button>
+          <button onclick="toggleDropdown('saveDropdown')" title="Save">💾</button>
           <div id="saveDropdown" class="dropdown-content">
             <button onclick="toggleDropdown('saveDropdown'); exportToFile(true, true)">Save</button>
             <button onclick="toggleDropdown('saveDropdown'); exportToFile(false, true)">Share</button>
