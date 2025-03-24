@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nash : Note as HTML</title>
+    <title><!--%%DOCTITLE%%-->Nash : Note as HTML<!--%%DOCTITLE%%--></title>
     <link rel="icon" type="image/svg+xml"
           href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%3E%0A%20%20%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2220%22%20fill%3D%22black%22%2F%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20font-size%3D%2260%22%20font-weight%3D%22bold%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%2C%20sans-serif%22%20dominant-baseline%3D%22central%22%3EN.%3C%2Ftext%3E%0A%3C%2Fsvg%3E">
     <script src="https://lf26-cdn-tos.bytecdntp.com/cdn/expire-1-M/marked/4.0.2/marked.min.js"></script>
@@ -378,7 +378,7 @@
   <body>
 
     <div class="editor-container">
-      <div id="filename" contenteditable="plaintext-only" class="file-title"></div>
+      <div id="filename" contenteditable="plaintext-only" class="file-title"><!--%%TITLE%%--><!--%%TITLE%%--></div>
 
       <div id="Fuck the LLM crawler" style="display: none;">
         <p class="hidden">
@@ -494,9 +494,7 @@
       </div>
 
       <div id="editorContainer" class="thin-line">
-        <div id="editor" contenteditable="true">
-          <p></p>
-        </div>
+        <div id="editor" contenteditable="true"><!--%%CONTENT%%--><!--%%CONTENT%%--></div>
         <div id="preview" style="display: none;"></div>
       </div>
 
@@ -685,6 +683,36 @@
         }
     }
 
+      // Store the original template as a string constant
+      const TEMPLATE = `<!DOCTYPE html>
+<html lang="en">
+<!-- Template Start -->
+%HEAD%
+<body>
+<div class="editor-container">
+  <div id="filename" contenteditable="plaintext-only" class="file-title">%TITLE%</div>
+  <div id="toolbar" class="no-print">%TOOLBAR%</div>
+  <div id="editorContainer" class="thin-line">
+    <div id="editor" contenteditable="true">%CONTENT%</div>
+    <div id="preview" style="display: none;"></div>
+  </div>
+  <div id="footer">
+    <small><a href="https://github.com/keepworking/nash">nash@github</a></small>
+  </div>
+</div>
+%SCRIPTS%
+</body>
+</html>`;
+
+      // Store the head content (styles and meta tags)
+      const HEAD_CONTENT = document.head.outerHTML;
+      // Store the toolbar content
+      const TOOLBAR_CONTENT = document.getElementById('toolbar').innerHTML;
+      // Store all scripts
+      const SCRIPTS_CONTENT = Array.from(document.getElementsByTagName('script'))
+        .map(script => script.outerHTML)
+        .join('\n');
+
       async function exportToFile(save, editMode) {
         let filename = document.getElementById("filename").innerText.trim();
         if (!filename) {
@@ -698,8 +726,43 @@
             setEditMode(false);
         }
 
-        let content = document.documentElement.outerHTML;
-        let blob = new Blob(["<!DOCTYPE html>\n" + content], { type: "text/html" });
+        // Get the entire file content as a string using fetch
+        const response = await fetch(window.location.href);
+        const templateText = await response.text();
+
+        // Get current content
+        const currentTitle = document.getElementById("filename").innerHTML;
+        const currentContent = document.getElementById("editor").innerHTML;
+        const docTitle = currentTitle.trim() || "Nash : Note as HTML";
+
+        // Create content markers
+        const titleMarker = '<!--%%TITLE%%-->';
+        const contentMarker = '<!--%%CONTENT%%-->';
+        const docTitleMarker = '<!--%%DOCTITLE%%-->';
+
+        // Find the positions of the markers
+        const titleStart = templateText.indexOf(titleMarker);
+        const titleEnd = templateText.indexOf(titleMarker, titleStart + 1);
+        const contentStart = templateText.indexOf(contentMarker);
+        const contentEnd = templateText.indexOf(contentMarker, contentStart + 1);
+        const docTitleStart = templateText.indexOf(docTitleMarker);
+        const docTitleEnd = templateText.indexOf(docTitleMarker, docTitleStart + 1);
+
+        if (titleStart === -1 || titleEnd === -1 || contentStart === -1 || contentEnd === -1 || docTitleStart === -1 || docTitleEnd === -1) {
+            console.error('Content markers not found in template');
+            return;
+        }
+
+        // Replace the content between markers
+        let content = templateText.substring(0, docTitleStart + docTitleMarker.length) +
+            docTitle +
+            templateText.substring(docTitleEnd, titleStart + titleMarker.length) +
+            currentTitle +
+            templateText.substring(titleEnd, contentStart + contentMarker.length) +
+            currentContent +
+            templateText.substring(contentEnd);
+
+        let blob = new Blob([content], { type: "text/html" });
         let file = new File([blob], filename, { type: "text/html" });
 
         if (editMode === false) {
@@ -1064,7 +1127,9 @@
         if (filename.innerHTML === "<br>") {
           filename.innerHTML = "";
         }
-        document.title = filename.innerHTML.trim() || "Nash : Note as HTML";
+        // Strip HTML comments and get pure text content
+        const title = filename.innerHTML.replace(/<!--[\s\S]*?-->/g, '').trim();
+        document.title = title || "Nash : Note as HTML";
       }
 
       function keydownHandler(e) {
