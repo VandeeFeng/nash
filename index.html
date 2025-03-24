@@ -524,7 +524,74 @@
         }
       }
 
+      // Move convertNodeToMarkdown outside to avoid recreation
+      function convertNodeToMarkdown(node) {
+          if (node.nodeType === Node.TEXT_NODE) {
+              return node.textContent;
+          }
+          
+          if (node.nodeType === Node.ELEMENT_NODE) {
+              const tag = node.tagName.toLowerCase();
+              let text = node.textContent.trim();
+              
+              // First check if the text content is already in Markdown format
+              if (text.startsWith('```') || text.startsWith('#')) {
+                  return text + '\n\n';
+              }
+              
+              // Use StringBuilder pattern for better performance
+              const parts = [];
+              
+              // Handle block elements
+              if (tag.match(/^h[1-6]$/)) {
+                  const level = tag[1];
+                  parts.push('#'.repeat(level), ' ', node.textContent, '\n\n');
+              }
+              else if (tag === 'p') {
+                  // Process children only if they exist
+                  if (node.hasChildNodes()) {
+                      const childParts = Array.from(node.childNodes)
+                          .map(child => convertNodeToMarkdown(child));
+                      parts.push(...childParts);
+                  }
+                  // Remove escape characters for markdown syntax
+                  const text = parts.join('').replace(/\\([#`*_{}[\]()>+-.])/g, '$1');
+                  return text + '\n\n';
+              }
+              // Handle inline elements
+              else if (tag === 'strong' || tag === 'b') {
+                  parts.push('**', node.textContent, '**');
+              }
+              else if (tag === 'em' || tag === 'i') {
+                  parts.push('*', node.textContent, '*');
+              }
+              else if (tag === 'u') {
+                  parts.push('_', node.textContent, '_');
+              }
+              else if (tag === 'a') {
+                  parts.push('[', node.textContent, '](', node.href, ')');
+              }
+              else if (tag === 'img') {
+                  const alt = node.alt || '';
+                  parts.push('![', alt, '](', node.src, ')\n\n');
+              }
+              else if (tag === 'span') {
+                  // Process span children only if they exist
+                  if (node.hasChildNodes()) {
+                      const childParts = Array.from(node.childNodes)
+                          .map(child => convertNodeToMarkdown(child));
+                      parts.push(...childParts);
+                  }
+              }
+              
+              return parts.join('');
+          }
+          
+          return '';
+      }
+
       let isPreviewMode = false;
+      let previewDebounceTimer = null;
       
       function toggleMarkdownPreview() {
           const editor = document.getElementById('editor');
@@ -533,75 +600,41 @@
           isPreviewMode = !isPreviewMode;
           
           if (isPreviewMode) {
-              // Convert HTML to Markdown first
-              function convertNodeToMarkdown(node) {
-                  if (node.nodeType === Node.TEXT_NODE) {
-                      return node.textContent;
+              // Use DocumentFragment for better performance
+              const fragment = document.createDocumentFragment();
+              const contentParts = [];
+              
+              // Process nodes in chunks for better performance
+              const processNodesInChunks = (nodes, chunkSize = 10) => {
+                  const chunks = Math.ceil(nodes.length / chunkSize);
+                  let currentChunk = 0;
+                  
+                  function processNextChunk() {
+                      const start = currentChunk * chunkSize;
+                      const end = Math.min(start + chunkSize, nodes.length);
+                      
+                      for (let i = start; i < end; i++) {
+                          contentParts.push(convertNodeToMarkdown(nodes[i]));
+                      }
+                      
+                      currentChunk++;
+                      
+                      if (currentChunk < chunks) {
+                          // Process next chunk in the next frame
+                          requestAnimationFrame(processNextChunk);
+                      } else {
+                          // All chunks processed, update preview
+                          const content = contentParts.join('').replace(/\n{3,}/g, '\n\n').trim();
+                          preview.innerHTML = marked.parse(content);
+                      }
                   }
                   
-                  if (node.nodeType === Node.ELEMENT_NODE) {
-                      let markdown = '';
-                      const tag = node.tagName.toLowerCase();
-                      let text = node.textContent.trim();
-                      
-                      // First check if the text content is already in Markdown format
-                      if (text.startsWith('```') || text.startsWith('#')) {
-                          return text + '\n\n';
-                      }
-                      
-                      // Handle block elements
-                      if (tag.match(/^h[1-6]$/)) {
-                          const level = tag[1];
-                          markdown = '#'.repeat(level) + ' ' + node.textContent + '\n\n';
-                      }
-                      else if (tag === 'p') {
-                          const text = Array.from(node.childNodes)
-                              .map(child => convertNodeToMarkdown(child))
-                              .join('');
-                          // Remove escape characters for markdown syntax
-                          const cleanText = text.replace(/\\([#`*_{}[\]()>+-.])/g, '$1');
-                          markdown = cleanText + '\n\n';
-                      }
-                      // Handle inline elements
-                      else if (tag === 'strong' || tag === 'b') {
-                          markdown = '**' + node.textContent + '**';
-                      }
-                      else if (tag === 'em' || tag === 'i') {
-                          markdown = '*' + node.textContent + '*';
-                      }
-                      else if (tag === 'u') {
-                          markdown = '_' + node.textContent + '_';
-                      }
-                      else if (tag === 'a') {
-                          markdown = '[' + node.textContent + '](' + node.href + ')';
-                      }
-                      else if (tag === 'img') {
-                          const alt = node.alt || '';
-                          markdown = '![' + alt + '](' + node.src + ')\n\n';
-                      }
-                      else if (tag === 'span') {
-                          // For spans, just process their content
-                          markdown = Array.from(node.childNodes)
-                              .map(child => convertNodeToMarkdown(child))
-                              .join('');
-                      }
-                      
-                      return markdown;
-                  }
-                  
-                  return '';
-              }
-
-              let content = '';
-              editor.childNodes.forEach(node => {
-                  content += convertNodeToMarkdown(node);
-              });
+                  processNextChunk();
+              };
               
-              // Clean up multiple newlines
-              content = content.replace(/\n{3,}/g, '\n\n').trim();
+              // Start processing in chunks
+              processNodesInChunks(Array.from(editor.childNodes));
               
-              // Convert to HTML using marked
-              preview.innerHTML = marked.parse(content);
               editor.style.display = 'none';
               preview.style.display = 'block';
           } else {
@@ -621,65 +654,6 @@
         
         const editor = document.getElementById("editor");
         let content = '';
-        
-        // Convert HTML to Markdown
-        function convertNodeToMarkdown(node) {
-            if (node.nodeType === Node.TEXT_NODE) {
-                return node.textContent;
-            }
-            
-            if (node.nodeType === Node.ELEMENT_NODE) {
-                let markdown = '';
-                const tag = node.tagName.toLowerCase();
-                let text = node.textContent.trim();
-                
-                // First check if the text content is already in Markdown format
-                if (text.startsWith('```') || text.startsWith('#')) {
-                    return text + '\n\n';
-                }
-                
-                // Handle block elements
-                if (tag.match(/^h[1-6]$/)) {
-                    const level = tag[1];
-                    markdown = '#'.repeat(level) + ' ' + node.textContent + '\n\n';
-                }
-                else if (tag === 'p') {
-                    const text = Array.from(node.childNodes)
-                        .map(child => convertNodeToMarkdown(child))
-                        .join('');
-                    // Remove escape characters for markdown syntax
-                    const cleanText = text.replace(/\\([#`*_{}[\]()>+-.])/g, '$1');
-                    markdown = cleanText + '\n\n';
-                }
-                // Handle inline elements
-                else if (tag === 'strong' || tag === 'b') {
-                    markdown = '**' + node.textContent + '**';
-                }
-                else if (tag === 'em' || tag === 'i') {
-                    markdown = '*' + node.textContent + '*';
-                }
-                else if (tag === 'u') {
-                    markdown = '_' + node.textContent + '_';
-                }
-                else if (tag === 'a') {
-                    markdown = '[' + node.textContent + '](' + node.href + ')';
-                }
-                else if (tag === 'img') {
-                    const alt = node.alt || '';
-                    markdown = '![' + alt + '](' + node.src + ')\n\n';
-                }
-                else if (tag === 'span') {
-                    // For spans, just process their content
-                    markdown = Array.from(node.childNodes)
-                        .map(child => convertNodeToMarkdown(child))
-                        .join('');
-                }
-                
-                return markdown;
-            }
-            
-            return '';
-        }
         
         // Process each block element
         editor.childNodes.forEach(node => {
