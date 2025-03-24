@@ -401,6 +401,8 @@
         <button onclick="applyFormat('u')"><u>U</u></button>
         <button onclick="applyURL()">🔗</button>
 
+        <button onclick="formatAll()">🧹</button>
+
         <label for="imageUpload">📷</label>
         <input type="file" id="imageUpload" accept="image/*" onchange="insertImage(event)">
 
@@ -744,6 +746,32 @@
         });
       }
 
+      // Format all content to p tags
+      function formatAll() {
+        const editor = document.getElementById('editor');
+        const nodes = Array.from(editor.childNodes);
+        nodes.forEach(node => {
+          if (node.nodeType === Node.ELEMENT_NODE && node.tagName !== 'P') {
+            const p = document.createElement('p');
+            p.innerHTML = node.innerHTML;
+            editor.replaceChild(p, node);
+          } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+            const p = document.createElement('p');
+            p.textContent = node.textContent;
+            editor.replaceChild(p, node);
+          }
+        });
+        
+        // Remove any nested p tags
+        editor.querySelectorAll('p p').forEach(nested => {
+          const parent = nested.parentNode;
+          while (nested.firstChild) {
+            parent.insertBefore(nested.firstChild, nested);
+          }
+          parent.removeChild(nested);
+        });
+      }
+
       // Basic inline formatting: wraps the selection in the specified tag.
       function applyFormat(tagName) {
         const selection = window.getSelection();
@@ -751,7 +779,27 @@
         const range = selection.getRangeAt(0);
         const editor = document.getElementById('editor');
         if (!editor.contains(range.commonAncestorContainer)) return;
-        wrapRangeText(range, tagName);
+
+        // Check if the selection is already wrapped in the target tag
+        let isFormatted = false;
+        let node = range.commonAncestorContainer;
+        while (node && node !== editor) {
+          if (node.nodeName.toLowerCase() === tagName.toLowerCase()) {
+            isFormatted = true;
+            // Remove the formatting by unwrapping the content
+            while (node.firstChild) {
+              node.parentNode.insertBefore(node.firstChild, node);
+            }
+            node.parentNode.removeChild(node);
+            return;
+          }
+          node = node.parentNode;
+        }
+
+        // If not formatted, apply the format
+        if (!isFormatted) {
+          wrapRangeText(range, tagName);
+        }
         selection.removeAllRanges();
       }
 
@@ -809,6 +857,13 @@
           node = node.parentNode;
         }
         if (!node || node === editor) return;
+
+        // Check if the current block is already the target tag
+        if (node.nodeName.toLowerCase() === tag.toLowerCase()) {
+          // If it is, convert it back to a paragraph
+          tag = 'p';
+        }
+
         const newBlock = document.createElement(tag);
         while (node.firstChild) {
           if (
