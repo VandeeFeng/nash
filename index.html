@@ -838,6 +838,20 @@
             currentContent +
             templateText.substring(contentEnd);
 
+        // If not in edit mode, remove unnecessary elements
+        if (editMode === false) {
+            // Create a temporary div to parse the HTML
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+
+            // Remove unnecessary elements
+            const elementsToRemove = tempDiv.querySelectorAll('#toolbar, #preview');
+            elementsToRemove.forEach(el => el.remove());
+
+            // Update content with cleaned HTML
+            content = tempDiv.innerHTML;
+        }
+
         let blob = new Blob([content], { type: "text/html" });
         let file = new File([blob], filename, { type: "text/html" });
 
