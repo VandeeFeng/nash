@@ -981,52 +981,156 @@
       // Format all content to p tags
       function formatAll() {
         const editor = document.getElementById('editor');
-        const nodes = Array.from(editor.childNodes);
+        const selection = window.getSelection();
         
-        // Helper function to clean node content
-        function cleanNodeContent(node) {
-          // Remove color and background-color styles from spans
-          const spans = node.querySelectorAll('span');
-          spans.forEach(span => {
-            if (span.style.color || span.style.backgroundColor) {
-              const text = document.createTextNode(span.textContent);
-              span.parentNode.replaceChild(text, span);
-            }
+        if (!selection.rangeCount) return;
+        const range = selection.getRangeAt(0);
+        if (!editor.contains(range.commonAncestorContainer)) return;
+
+        // If selection is collapsed (just cursor)
+        if (selection.isCollapsed) {
+          let node = selection.anchorNode;
+          let offset = selection.anchorOffset;
+
+          // Get the current block element (p, h1, etc.)
+          let block = node;
+          while (block && block.parentNode !== editor) {
+            block = block.parentNode;
+          }
+          if (!block) return;
+
+          // Create a range for the content before cursor
+          const range = document.createRange();
+          range.setStart(block, 0);
+          range.setEnd(node, offset);
+
+          // Get the content
+          const fragment = range.cloneContents();
+          const tempDiv = document.createElement('div');
+          tempDiv.appendChild(fragment);
+
+          // Clean the content
+          const cleanText = tempDiv.textContent;
+          
+          // Create a new paragraph with clean text
+          const p = document.createElement('p');
+          p.textContent = cleanText;
+          
+          // Replace the original block with the paragraph
+          editor.replaceChild(p, block);
+        } else {
+          // For selected text
+          const fragment = range.cloneContents();
+          const tempDiv = document.createElement('div');
+          tempDiv.appendChild(fragment);
+          
+          // Convert all blocks to paragraphs with clean text
+          const blocks = Array.from(tempDiv.children);
+          blocks.forEach(block => {
+            const p = document.createElement('p');
+            p.textContent = block.textContent;
+            block.parentNode.replaceChild(p, block);
           });
           
-          // Clean empty spans
-          node.querySelectorAll('span:empty').forEach(span => span.remove());
-          
-          return node;
-        }
-        
-        nodes.forEach(node => {
-          if (node.nodeType === Node.ELEMENT_NODE && node.tagName !== 'P') {
+          // If no blocks (pure text selection), wrap in paragraph
+          if (blocks.length === 0 && tempDiv.textContent.trim()) {
             const p = document.createElement('p');
-            p.innerHTML = node.innerHTML;
-            cleanNodeContent(p);
-            editor.replaceChild(p, node);
-          } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
-            const p = document.createElement('p');
-            p.textContent = node.textContent;
-            editor.replaceChild(p, node);
-          } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'P') {
-            cleanNodeContent(node);
+            p.textContent = tempDiv.textContent;
+            tempDiv.innerHTML = '';
+            tempDiv.appendChild(p);
           }
-        });
+          
+          // Replace the content
+          range.deleteContents();
+          while (tempDiv.firstChild) {
+            range.insertNode(tempDiv.firstChild);
+          }
+        }
+
+        // Normalize the editor to clean up empty nodes
+        editor.normalize();
       }
 
       // Basic inline formatting: wraps the selection in the specified tag.
       function applyFormat(tagName) {
         const selection = window.getSelection();
-        if (!selection.rangeCount || selection.isCollapsed) return;
-        const range = selection.getRangeAt(0);
         const editor = document.getElementById('editor');
+        
+        // If no selection or cursor is not in editor, return
+        if (!selection.rangeCount) return;
+        const range = selection.getRangeAt(0);
         if (!editor.contains(range.commonAncestorContainer)) return;
 
-        // Check if the selection is already wrapped in the target tag
+        // If selection is collapsed (just cursor)
+        if (selection.isCollapsed) {
+          let node = selection.anchorNode;
+          let offset = selection.anchorOffset;
+
+          // Get the current block element (p, h1, etc.)
+          let block = node;
+          while (block && block.parentNode !== editor) {
+            block = block.parentNode;
+          }
+          if (!block) return;
+
+          // Create a range for the content before cursor in current block
+          const blockRange = document.createRange();
+          
+          // If we're in a text node, use it directly
+          if (node.nodeType === Node.TEXT_NODE) {
+            blockRange.setStart(node, 0);
+            blockRange.setEnd(node, offset);
+          } else {
+            // If we're in an element node, find the first text node
+            const walker = document.createTreeWalker(
+              block,
+              NodeFilter.SHOW_TEXT,
+              null,
+              false
+            );
+            const textNodes = [];
+            let currentNode;
+            while (currentNode = walker.nextNode()) {
+              textNodes.push(currentNode);
+            }
+            
+            if (textNodes.length > 0) {
+              blockRange.setStart(textNodes[0], 0);
+              const lastNode = textNodes[textNodes.length - 1];
+              blockRange.setEnd(lastNode, lastNode.length);
+            } else {
+              return; // No text to format
+            }
+          }
+
+          // Check if the line is already formatted
+          let isFormatted = false;
+          let currentNode = node;
+          while (currentNode && currentNode !== editor) {
+            if (currentNode.nodeName.toLowerCase() === tagName.toLowerCase()) {
+              isFormatted = true;
+              // Remove the formatting by unwrapping the content
+              while (currentNode.firstChild) {
+                currentNode.parentNode.insertBefore(currentNode.firstChild, currentNode);
+              }
+              currentNode.parentNode.removeChild(currentNode);
+              return;
+            }
+            currentNode = currentNode.parentNode;
+          }
+
+          // If not formatted, apply the format
+          if (!isFormatted) {
+            wrapRangeText(blockRange, tagName);
+          }
+          selection.removeAllRanges();
+          return;
+        }
+
+        // Original code for selected text
+        const originalRange = range;
         let isFormatted = false;
-        let node = range.commonAncestorContainer;
+        let node = originalRange.commonAncestorContainer;
         while (node && node !== editor) {
           if (node.nodeName.toLowerCase() === tagName.toLowerCase()) {
             isFormatted = true;
@@ -1042,7 +1146,7 @@
 
         // If not formatted, apply the format
         if (!isFormatted) {
-          wrapRangeText(range, tagName);
+          wrapRangeText(originalRange, tagName);
         }
         selection.removeAllRanges();
       }
